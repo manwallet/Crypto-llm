@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from newsapi import NewsApiClient
 import openai
 from dotenv import load_dotenv
+from .prompt_manager import PromptManager
 
 class NewsAnalyzer:
     def __init__(self):
@@ -12,22 +13,26 @@ class NewsAnalyzer:
         self.openai.api_key = os.getenv('OPENAI_API_KEY')
         self.trading_pair = os.getenv('TRADING_PAIR', 'BTCUSDT')
         self.base_currency = self.trading_pair[:3]  # 获取基础货币（如BTC）
+        self.prompt_manager = PromptManager()
         
     def analyze(self):
         """分析新闻并返回交易信号"""
-        # 获取最近30分钟的加密货币新闻
+        # 获取最近新闻
         news = self._fetch_recent_news()
         if not news:
             return None
             
+        # 准备新闻上下文
+        processed_news = self.prompt_manager.prepare_news_context(news)
+        
         # 使用GPT分析新闻情绪
-        sentiment = self._analyze_sentiment(news)
+        sentiment = self._analyze_sentiment(processed_news)
         
         return {
             'timestamp': datetime.now(),
             'sentiment': sentiment,
             'source': 'news',
-            'data': news
+            'data': processed_news
         }
         
     def _fetch_recent_news(self):
@@ -54,25 +59,20 @@ class NewsAnalyzer:
             print(f"Error fetching news: {e}")
             return None
             
-    def _analyze_sentiment(self, news):
+    def _analyze_sentiment(self, processed_news):
         """使用GPT分析新闻情绪"""
         try:
             # 准备新闻文本
-            news_text = "\n".join([
-                f"Title: {article['title']}\nDescription: {article['description']}"
-                for article in news[:5]  # 只分析最新的5条新闻
+            news_text = "\n\n".join([
+                f"Source: {article['source']}\n"
+                f"Time: {article['time']}\n"
+                f"Title: {article['title']}\n"
+                f"Summary: {article['summary']}"
+                for article in processed_news
             ])
             
-            # 创建GPT提示
-            prompt = f"""Analyze the sentiment of the following cryptocurrency news regarding {self.base_currency}. 
-            Rate the overall market sentiment on a scale from -1 (extremely bearish) to 1 (extremely bullish).
-            Consider the impact on short-term price movements.
-            
-            News:
-            {news_text}
-            
-            Please provide only the numerical sentiment score.
-            """
+            # 获取分析提示词
+            prompt = self.prompt_manager.get_news_analysis_prompt(news_text, self.base_currency)
             
             # 调用GPT API
             response = self.openai.chat.completions.create(
@@ -80,7 +80,8 @@ class NewsAnalyzer:
                 messages=[
                     {"role": "system", "content": "You are a cryptocurrency market analyst."},
                     {"role": "user", "content": prompt}
-                ]
+                ],
+                temperature=0.3  # 降低温度以获得更一致的输出
             )
             
             # 解析响应

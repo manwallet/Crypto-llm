@@ -4,6 +4,8 @@ import numpy as np
 from datetime import datetime, timedelta
 import pandas as pd
 from dotenv import load_dotenv
+import openai
+from .prompt_manager import PromptManager
 
 class EmergencyManager:
     def __init__(self):
@@ -17,6 +19,9 @@ class EmergencyManager:
         self.volume_surge_threshold = 3.0  # 3倍交易量突增阈值
         self.price_change_threshold = 3.0  # 3% 价格变化阈值
         self.liquidation_threshold = -15.0  # -15% 未实现盈亏阈值
+        self.prompt_manager = PromptManager()
+        self.openai = openai
+        self.openai.api_key = os.getenv('OPENAI_API_KEY')
         
     def check_emergency(self):
         """检查是否存在紧急情况"""
@@ -26,22 +31,38 @@ class EmergencyManager:
             if market_data is None:
                 return False
                 
+            # 获取市场上下文
+            market_context = self.prompt_manager.prepare_market_context(market_data)
+            
+            # 获取持仓信息
+            position_info = self._get_position_info()
+            
+            # 使用GPT评估风险
+            risk_score = self._assess_risk(position_info, market_context)
+            
             # 检查各种紧急情况
             volatility_emergency = self._check_volatility(market_data)
             volume_emergency = self._check_volume_surge(market_data)
             price_emergency = self._check_price_change(market_data)
             position_emergency = self._check_position_risk()
             
-            # 如果任何一个检查返回True，就触发紧急情况
+            # 如果任何一个检查返回True，或风险评分过高，就触发紧急情况
             is_emergency = any([
                 volatility_emergency,
                 volume_emergency,
                 price_emergency,
-                position_emergency
+                position_emergency,
+                risk_score > 0.8  # 风险评分阈值
             ])
             
             if is_emergency:
-                self._log_emergency(locals())
+                self._log_emergency({
+                    'volatility_emergency': volatility_emergency,
+                    'volume_emergency': volume_emergency,
+                    'price_emergency': price_emergency,
+                    'position_emergency': position_emergency,
+                    'risk_score': risk_score
+                })
                 
             return is_emergency
             
@@ -69,12 +90,59 @@ class EmergencyManager:
             # 转换数据类型
             df[['open', 'high', 'low', 'close', 'volume']] = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
             df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            df.set_index('timestamp', inplace=True)
             
             return df
             
         except Exception as e:
             print(f"Error getting market data: {e}")
             return None
+            
+    def _get_position_info(self):
+        """获取持仓信息"""
+        try:
+            position = self.client.futures_position_information(symbol=self.trading_pair)[0]
+            return {
+                'size': float(position['positionAmt']),
+                'entry_price': float(position['entryPrice']),
+                'mark_price': float(position['markPrice']),
+                'unrealized_pnl': float(position['unRealizedProfit']),
+                'leverage': float(position['leverage']),
+                'liquidation_price': float(position['liquidationPrice'])
+            }
+        except Exception as e:
+            print(f"Error getting position information: {e}")
+            return None
+            
+    def _assess_risk(self, position_info, market_context):
+        """使用GPT评估风险"""
+        try:
+            if position_info is None:
+                return 0
+                
+            # 获取风险评估提示词
+            prompt = self.prompt_manager.get_risk_assessment_prompt(
+                position_data=position_info,
+                market_conditions=market_context
+            )
+            
+            # 调用GPT API
+            response = self.openai.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are a risk management specialist."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3
+            )
+            
+            # 解析响应
+            risk_score = float(response.choices[0].message.content.strip())
+            return risk_score
+            
+        except Exception as e:
+            print(f"Error assessing risk: {e}")
+            return 0
             
     def _check_volatility(self, df):
         """检查波动率"""
@@ -125,19 +193,16 @@ class EmergencyManager:
     def _check_position_risk(self):
         """检查持仓风险"""
         try:
-            # 获取当前持仓信息
-            position = self.client.futures_position_information(symbol=self.trading_pair)[0]
-            
-            # 计算未实现盈亏百分比
-            entry_price = float(position['entryPrice'])
-            position_size = float(position['positionAmt'])
-            unrealized_pnl = float(position['unRealizedProfit'])
-            
-            if entry_price == 0 or position_size == 0:
+            position = self._get_position_info()
+            if position is None or position['size'] == 0:
                 return False
                 
             # 计算未实现盈亏百分比
-            pnl_percentage = (unrealized_pnl / (abs(position_size) * entry_price)) * 100
+            entry_value = abs(position['size'] * position['entry_price'])
+            if entry_value == 0:
+                return False
+                
+            pnl_percentage = (position['unrealized_pnl'] / entry_value) * 100
             
             return pnl_percentage < self.liquidation_threshold
             
@@ -155,7 +220,8 @@ class EmergencyManager:
                 'volatility_emergency': data.get('volatility_emergency'),
                 'volume_emergency': data.get('volume_emergency'),
                 'price_emergency': data.get('price_emergency'),
-                'position_emergency': data.get('position_emergency')
+                'position_emergency': data.get('position_emergency'),
+                'risk_score': data.get('risk_score', 0)
             }
             
             # 这里可以添加日志记录逻辑，比如写入文件或数据库
