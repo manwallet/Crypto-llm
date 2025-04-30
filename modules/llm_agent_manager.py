@@ -31,13 +31,13 @@ class LLMAgentManager:
         self.trade_history = TradeHistory()
         
         # 初始化代理角色和模型
-        self.analyst_agent = os.getenv('ANALYST_MODEL', 'gpt-4')  # 市场分析师
-        self.trader_agent = os.getenv('TRADER_MODEL', 'gpt-4')  # 交易决策者
-        self.risk_agent = os.getenv('RISK_MODEL', 'gpt-4')  # 风险管理者
-        self.emergency_agent = os.getenv('EMERGENCY_MODEL', 'gpt-4')  # 应急管理者
-        self.debate_agent = os.getenv('DEBATE_MODEL', 'gpt-4')  # 辩论协调者
-        self.validator_agent = os.getenv('VALIDATOR_MODEL', 'gpt-4')  # 验证者
-        self.historian_agent = os.getenv('HISTORIAN_MODEL', 'gpt-4')  # 历史分析师
+        self.analyst_agent = os.getenv('ANALYST_MODEL', 'claude-3-7-sonnet-20250219')  # 市场分析师
+        self.trader_agent = os.getenv('TRADER_MODEL', 'claude-3-7-sonnet-20250219')  # 交易决策者
+        self.risk_agent = os.getenv('RISK_MODEL', 'claude-3-7-sonnet-20250219')  # 风险管理者
+        self.emergency_agent = os.getenv('EMERGENCY_MODEL', 'claude-3-7-sonnet-20250219')  # 应急管理者
+        self.debate_agent = os.getenv('DEBATE_MODEL', 'claude-3-7-sonnet-20250219')  # 辩论协调者
+        self.validator_agent = os.getenv('VALIDATOR_MODEL', 'claude-3-7-sonnet-20250219')  # 验证者
+        self.historian_agent = os.getenv('HISTORIAN_MODEL', 'claude-3-7-sonnet-20250219')  # 历史分析师
         
         # 记录对话历史
         self.conversation_history = []
