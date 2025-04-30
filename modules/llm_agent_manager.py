@@ -14,6 +14,17 @@ class LLMAgentManager:
         load_dotenv()
         self.openai = openai
         self.openai.api_key = os.getenv('OPENAI_API_KEY')
+        
+        # 支持自定义API URL
+        self.base_url = os.getenv('OPENAI_API_BASE_URL')
+        if self.base_url:
+            self.openai.base_url = self.base_url
+            
+        # 支持自定义组织ID
+        self.org_id = os.getenv('OPENAI_ORG_ID')
+        if self.org_id:
+            self.openai.organization = self.org_id
+            
         self.prompt_manager = PromptManager()
         self.trading_pair = os.getenv('TRADING_PAIR', 'BTCUSDT')
         self.market_classifier = MarketClassifier()
@@ -36,6 +47,41 @@ class LLMAgentManager:
         
         # 市场状态记忆
         self.market_state = None
+    
+    def set_custom_api_url(self, base_url=None, api_key=None, org_id=None):
+        """设置自定义API URL和相关配置"""
+        if base_url:
+            self.base_url = base_url
+            self.openai.base_url = base_url
+            
+        if api_key:
+            self.openai.api_key = api_key
+            
+        if org_id:
+            self.org_id = org_id
+            self.openai.organization = org_id
+            
+        return {
+            "base_url": self.base_url,
+            "org_id": self.org_id,
+            "api_key_set": self.openai.api_key is not None
+        }
+        
+    def get_api_config(self):
+        """获取当前API配置信息"""
+        return {
+            "base_url": self.base_url,
+            "org_id": self.org_id,
+            "models": {
+                "analyst": self.analyst_agent,
+                "trader": self.trader_agent,
+                "risk": self.risk_agent,
+                "emergency": self.emergency_agent,
+                "debate": self.debate_agent,
+                "validator": self.validator_agent,
+                "historian": self.historian_agent
+            }
+        }
     
     def analyze_market(self, market_data):
         """市场分析代理，负责分析市场状况"""

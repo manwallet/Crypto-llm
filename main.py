@@ -27,6 +27,9 @@ class LLMTrader:
         self.position_manager = PositionManager()
         self.prompt_manager = PromptManager()
         
+        # 设置自定义API URL（如果环境变量中定义了）
+        self._configure_llm_api()
+        
         # 获取配置
         self.trading_pair = os.getenv('TRADING_PAIR', 'BTCUSDT')
         self.strategy_interval = int(os.getenv('STRATEGY_UPDATE_INTERVAL', 15))
@@ -42,6 +45,40 @@ class LLMTrader:
         # 日志目录
         self.log_dir = 'logs'
         os.makedirs(self.log_dir, exist_ok=True)
+        
+    def _configure_llm_api(self):
+        """配置LLM API连接"""
+        # 从环境变量获取自定义API配置
+        api_base_url = os.getenv('LLM_API_BASE_URL')
+        api_key = os.getenv('LLM_API_KEY')  # 可以与OPENAI_API_KEY不同
+        org_id = os.getenv('LLM_ORG_ID')
+        
+        # 如果指定了自定义API URL，则设置
+        if api_base_url:
+            print(f"使用自定义API端点: {api_base_url}")
+            config = self.llm_agent.set_custom_api_url(
+                base_url=api_base_url,
+                api_key=api_key,
+                org_id=org_id
+            )
+            print(f"API配置已更新: URL已设置={bool(config['base_url'])}, API密钥已设置={config['api_key_set']}")
+    
+    def set_custom_api_url(self, base_url, api_key=None, org_id=None):
+        """手动设置自定义API URL"""
+        config = self.llm_agent.set_custom_api_url(
+            base_url=base_url,
+            api_key=api_key,
+            org_id=org_id
+        )
+        print(f"API配置已手动更新:")
+        print(f"- 基础URL: {config['base_url']}")
+        print(f"- API密钥已设置: {config['api_key_set']}")
+        print(f"- 组织ID: {config['org_id'] or '未设置'}")
+        return config
+        
+    def get_api_config(self):
+        """获取当前API配置"""
+        return self.llm_agent.get_api_config()
         
     def start(self):
         print(f"AI语言模型交易系统启动于 {datetime.now()}")
