@@ -111,6 +111,72 @@ MAX_POSITION=0.05  # 最大持仓量
 # AI模型配置
 STRATEGY_UPDATE_INTERVAL=15  # 策略更新间隔（分钟）
 EMERGENCY_CHECK_INTERVAL=5  # 应急检查间隔（分钟）
+
+# 自定义LLM API设置（可选）
+LLM_API_BASE_URL=https://your-custom-endpoint.com/v1  # 自定义API基础URL
+LLM_API_KEY=your_api_key_here  # 自定义API密钥
+LLM_ORG_ID=your_org_id_here    # 自定义组织ID（可选）
+
+# 代理模型设置（可选）
+ANALYST_MODEL=claude-3-opus-20240229    # 市场分析师模型
+TRADER_MODEL=claude-3-opus-20240229     # 交易决策者模型
+RISK_MODEL=claude-3-sonnet-20240229     # 风险管理者模型
+```
+
+## 使用自定义语言模型API
+
+本系统支持使用OpenAI API格式的自定义语言模型端点，这使您能够：
+
+1. **使用Claude模型**：通过兼容OpenAI API的代理服务
+2. **使用自托管模型**：指向本地或自托管的语言模型API
+3. **使用其他云服务提供商**：如Azure OpenAI或其他提供兼容API的服务
+
+### 配置方法
+
+1. **通过环境变量配置**：
+   - 在`.env`文件中设置`LLM_API_BASE_URL`、`LLM_API_KEY`和可选的`LLM_ORG_ID`
+   - 系统启动时会自动加载这些配置
+
+2. **通过代码配置**：
+   ```python
+   from main import LLMTrader
+   
+   trader = LLMTrader()
+   # 设置自定义API URL
+   trader.set_custom_api_url(
+       base_url="https://your-custom-endpoint.com/v1",
+       api_key="your_api_key_here",
+       org_id="your_org_id_here"  # 可选
+   )
+   # 启动交易系统
+   trader.start()
+   ```
+
+3. **指定不同角色使用的模型**：
+   - 在`.env`文件中设置特定角色使用的模型名称
+   - 例如：`ANALYST_MODEL=claude-3-opus-20240229`
+   - 支持的角色模型设置包括：`ANALYST_MODEL`, `TRADER_MODEL`, `RISK_MODEL`, `EMERGENCY_MODEL`, `DEBATE_MODEL`, `VALIDATOR_MODEL`, `HISTORIAN_MODEL`
+
+### 常见自定义API端点示例
+
+#### Claude模型（通过代理服务）
+```
+LLM_API_BASE_URL=https://your-claude-proxy.com/v1
+LLM_API_KEY=your_api_key_here
+ANALYST_MODEL=claude-3-opus-20240229
+TRADER_MODEL=claude-3-opus-20240229
+```
+
+#### Azure OpenAI服务
+```
+LLM_API_BASE_URL=https://{your-resource-name}.openai.azure.com/openai/deployments/{deployment-id}
+LLM_API_KEY=your_azure_api_key
+```
+
+#### 本地托管模型
+```
+LLM_API_BASE_URL=http://localhost:8000/v1
+ANALYST_MODEL=your-local-model-name
 ```
 
 ## 使用方法
